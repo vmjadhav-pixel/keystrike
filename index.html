@@ -1,0 +1,462 @@
+<title>Keystrike</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* Layout: one centered column. Header (rank + streak), tab bar, then a Train map / Arcade / Stats view.
+   Identity: every finger owns a color. Keys, hints, particles and heatmaps all use it. Deliberately single-theme (a game). */
+:root{
+  --bg:#10121b; --panel:#191d2b; --panel2:#222739; --line:#2c3247;
+  --fg:#eceef6; --muted:#8c94ae; --dim:#5d6580;
+  --gold:#ffd166; --good:#6fdc8c; --bad:#ff5d73;
+  --f0:#ff6b8b; --f1:#ff9f5a; --f2:#ffd166; --f3:#7bdc8c; --f4:#4fd1c5; --f5:#5aa9ff; --f6:#8f7bff; --f7:#d77bff; --f8:#9aa3b8;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  color-scheme:dark;
+}
+:root{background:var(--bg)}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--fg);font:500 15px/1.5 var(--display);padding-inline:16px;padding-block:18px 40px}
+.wrap{max-width:980px;margin-inline:auto;display:flex;flex-direction:column;gap:18px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
+
+.top{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.logo{font-weight:800;font-size:26px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+.logo i{display:inline-grid;grid-template-columns:repeat(4,8px);gap:2px}
+.logo i b{width:8px;height:8px;border-radius:2px}
+.spacer{flex:1}
+.rank{display:flex;flex-direction:column;gap:4px;min-width:190px}
+.rank .r1{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted)}
+.rank .r1 b{color:var(--fg);font-weight:700}
+.bar{height:8px;border-radius:99px;background:var(--panel2);overflow:hidden}
+.bar>div{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--f4),var(--f3));transition:width .3s}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:6px 12px;font-size:13px;font-weight:700}
+.chip svg{width:14px;height:14px;fill:var(--f1)}
+.chip.btn:hover{border-color:var(--muted)}
+
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line)}
+.tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:10px 16px;font-weight:700;color:var(--muted);margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--fg);border-color:var(--gold)}
+.tabs button:hover{color:var(--fg)}
+
+.note{color:var(--muted);font-size:14px;margin:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
+.btn{background:var(--gold);color:#241b00;border:0;border-radius:10px;padding:10px 18px;font-weight:800}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:var(--panel2);color:var(--fg);border:1px solid var(--line)}
+.btn.ghost:hover{border-color:var(--muted)}
+
+/* Lesson map */
+.map{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.card{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0;transition:transform .12s,border-color .12s}
+.card:not(:disabled):hover{transform:translateY(-2px);border-color:var(--muted)}
+.card:disabled{opacity:.45;cursor:not-allowed}
+.card .n{font:800 12px var(--mono);color:var(--dim);letter-spacing:.08em}
+.card h3{font-size:17px;line-height:1.2}
+.card .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto}
+.caps{display:flex;gap:4px;flex-wrap:wrap}
+.cap{font:800 13px var(--mono);min-width:26px;height:26px;padding-inline:5px;display:grid;place-items:center;border-radius:6px;background:var(--panel2);border-bottom:3px solid var(--c,var(--line));color:var(--fg)}
+.stars{font-size:16px;letter-spacing:2px;color:var(--panel2);-webkit-text-stroke:1px var(--dim)}
+.stars b{color:var(--gold);-webkit-text-stroke:0;font-weight:400}
+.card .best{font:600 12px var(--mono);color:var(--muted)}
+.card.drill{border-style:dashed}
+
+/* Play */
+.playbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.playbar h2{font-size:20px}
+.hud{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;min-width:0}
+.stat .l{font:600 11px var(--mono);color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+.stat .v{font:800 34px/1.1 var(--mono);font-variant-numeric:tabular-nums}
+.stat .s{font-size:12px;color:var(--muted)}
+.gauge{width:100%;max-width:150px;display:block}
+.gauge path{fill:none;stroke-width:10;stroke-linecap:round}
+.combobar{margin-top:6px}
+.combobar>div{background:linear-gradient(90deg,var(--f1),var(--f0))}
+.prog{height:6px}
+.textbox{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px 24px;height:calc(1.95em * 3 + 44px);font:400 clamp(19px,3.4vw,28px)/1.95 var(--mono);overflow:hidden}
+.textbox .inner{height:calc(1.95em * 3);overflow:hidden;position:relative}
+.w{display:inline-block;white-space:nowrap}
+.c{color:var(--dim);position:relative}
+.c.ok{color:var(--fg)}
+.c.fix{color:var(--gold)}
+.c.cur{color:var(--fg);background:var(--cc,var(--gold));background:color-mix(in srgb,var(--cc,var(--gold)) 38%,transparent);border-radius:4px;box-shadow:0 2px 0 var(--cc,var(--gold))}
+.c.cur.err{animation:shake .22s;background:var(--bad);color:#fff}
+.c.sp.ok::after,.c.sp.fix::after{content:""}
+.c.sp:not(.ok):not(.fix)::after{content:"\00b7";position:absolute;left:0;right:0;text-align:center;color:var(--dim)}
+.c.sp{display:inline-block;width:.6em}
+.startHint{position:absolute;inset:0;display:grid;place-items:center;background:color-mix(in srgb,var(--panel) 82%,transparent);backdrop-filter:blur(2px);font:700 18px var(--display);color:var(--fg);pointer-events:none;text-align:center;padding:12px}
+.startHint span{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 16px}
+@keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+
+/* Keyboard */
+.kb{--ku:min(46px,calc((100vw - 40px)/12.4));display:flex;flex-direction:column;align-items:center;gap:5px;user-select:none}
+.krow{display:flex;gap:5px}
+.key{width:var(--ku);height:var(--ku);border-radius:8px;background:var(--panel2);border-bottom:4px solid color-mix(in srgb,var(--fc,var(--f8)) 55%,var(--panel2));display:grid;place-items:center;position:relative;font:600 calc(var(--ku)*.38)/1 var(--mono);color:color-mix(in srgb,var(--fc,var(--f8)) 70%,var(--fg));text-transform:uppercase;transition:background .12s,transform .08s}
+.key small{position:absolute;bottom:1px;font-size:calc(var(--ku)*.2);opacity:.85}
+.key.wide{width:calc(var(--ku)*1.45);font-size:calc(var(--ku)*.24);color:var(--muted);text-transform:none}
+.key.space{width:calc(var(--ku)*6);}
+.kb.play .key.next{background:var(--fc,var(--f8));color:#12141c;transform:translateY(2px);animation:pulse .9s ease-in-out infinite}
+.kb.play .key.hit{background:color-mix(in srgb,var(--fc) 55%,var(--panel2))}
+.kb.play .key.bad{background:var(--bad);color:#fff}
+@keyframes pulse{50%{box-shadow:0 0 0 5px color-mix(in srgb,var(--fc,var(--f8)) 35%,transparent)}}
+.hint{text-align:center;color:var(--muted);font-size:14px;min-height:22px}
+.hint b{color:var(--hc,var(--fg))}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;background:var(--c)}
+
+/* Result */
+.result{display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center;padding:28px 18px}
+.result h2{font-size:30px}
+.bigstars{display:flex;gap:10px}
+.bigstars svg{width:56px;height:56px;fill:var(--panel2);stroke:var(--dim);stroke-width:1.5}
+.bigstars svg.on{fill:var(--gold);stroke:var(--gold);animation:pop .5s cubic-bezier(.2,1.6,.4,1) both;animation-delay:var(--d)}
+@keyframes pop{from{transform:scale(0) rotate(-40deg)}to{transform:none}}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;width:100%;max-width:560px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+
+/* Arcade */
+.stage{position:relative;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#0b0d14}
+.stage canvas{display:block;width:100%;height:460px}
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:color-mix(in srgb,#0b0d14 86%,transparent);text-align:center;padding:20px}
+.overlay h2{font-size:32px}
+.overlay p{max-width:42ch;margin:0;color:var(--muted)}
+.ahud{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.ahud .stat{flex:1;min-width:110px}
+.hearts{display:flex;gap:5px;padding-top:6px}
+.hearts i{width:16px;height:16px;border-radius:50% 50% 4px 50%;transform:rotate(45deg) scale(.8);background:var(--f0)}
+.hearts i.off{background:var(--panel2)}
+
+/* Stats */
+.sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.two{grid-template-columns:1fr}.hud{grid-template-columns:1fr 1fr}.hud .stat:first-child{grid-column:1/-1}}
+.weak{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.weak li{display:flex;align-items:center;gap:10px;font-size:14px}
+.weak li span:last-child{color:var(--muted);margin-left:auto;font:600 12px var(--mono)}
+.chart{width:100%;height:auto;display:block}
+.chart text{font:600 10px var(--mono);fill:var(--muted)}
+.heat .key{color:#10121b;font-weight:800;border-bottom-color:transparent}
+.heat .key small{color:#10121b}
+
+#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:50}
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 18px);transform:translateX(-50%) translateY(-30px);background:var(--gold);color:#241b00;font-weight:800;padding:10px 18px;border-radius:12px;opacity:0;transition:.3s;z-index:60;pointer-events:none;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.pop{position:fixed;font:800 28px var(--display);pointer-events:none;z-index:55;color:var(--gold);animation:rise .9s ease-out forwards;text-shadow:0 2px 12px #000}
+@keyframes rise{to{transform:translateY(-60px);opacity:0}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<canvas id="fx" aria-hidden="true"></canvas>
+<div class="toast" id="toast" role="status"></div>
+
+<div class="wrap">
+  <header class="top">
+    <div class="logo"><i id="logoKeys"></i>Keystrike</div>
+    <div class="spacer"></div>
+    <div class="rank">
+      <div class="r1"><b id="rankName">Hunt-and-Pecker</b><span id="lvl">LV 1</span></div>
+      <div class="bar"><div id="xpbar"></div></div>
+    </div>
+    <div class="chip" title="Days in a row you practiced"><svg viewBox="0 0 24 24"><path d="M12 2c1 4-3 6-3 10a5 5 0 0 0 10 0c0-2-1-3-2-5 0 2-1 3-2 3 1-4-1-6-3-8zM12 22a4 4 0 0 1-4-4c1 1 2 1 3 0 0 2 2 2 3 0 1 2 1 4-2 4z"/></svg><span id="streak">0 day streak</span></div>
+    <button class="chip btn" id="snd" aria-pressed="true">Sound on</button>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-view="train" aria-selected="true">Train</button>
+    <button role="tab" data-view="arcade" aria-selected="false">Word Rain</button>
+    <button role="tab" data-view="stats" aria-selected="false">Progress</button>
+  </nav>
+
+  <section id="v-train">
+    <div id="map-wrap" style="display:flex;flex-direction:column;gap:14px">
+      <p class="note">Eleven lessons add keys a few at a time. Wrong keys don't count, so slow down until you're clean, then speed up. Pass a lesson with 90% accuracy to unlock the next one. This game needs a physical keyboard.</p>
+      <div class="map" id="map"></div>
+    </div>
+
+    <div id="play" hidden style="display:flex;flex-direction:column;gap:14px">
+      <div class="playbar"><h2 id="pTitle"></h2><span class="chip" id="pGoal"></span><div class="spacer"></div><button class="btn ghost" id="pQuit">Esc to quit</button></div>
+      <div class="hud">
+        <div class="stat"><div class="l">Speed</div>
+          <svg class="gauge" viewBox="0 0 120 70" aria-hidden="true"><path d="M10 62A50 50 0 0 1 110 62" stroke="var(--panel2)"/><path id="gArc" d="M10 62A50 50 0 0 1 110 62" stroke="var(--f4)" stroke-dasharray="157" stroke-dashoffset="157"/></svg>
+          <div class="v" id="hWpm">0 <span class="s">wpm</span></div></div>
+        <div class="stat"><div class="l">Accuracy</div><div class="v" id="hAcc">100%</div><div class="s" id="hErr">0 mistakes</div></div>
+        <div class="stat"><div class="l">Combo</div><div class="v" id="hCombo">0</div><div class="bar combobar"><div id="comboFill"></div></div></div>
+      </div>
+      <div class="bar prog"><div id="prog"></div></div>
+      <div class="textbox" id="tbox"><div class="inner" id="text"></div><div class="startHint" id="startHint"><span>Place your fingers on the home row, then start typing</span></div></div>
+      <div class="kb play" id="kb"></div>
+      <div class="hint" id="hint"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div id="result" class="panel result" hidden></div>
+  </section>
+
+  <section id="v-arcade" hidden style="display:flex;flex-direction:column;gap:14px">
+    <div class="ahud">
+      <div class="stat"><div class="l">Score</div><div class="v" id="aScore">0</div></div>
+      <div class="stat"><div class="l">Wave</div><div class="v" id="aWave">1</div></div>
+      <div class="stat"><div class="l">Combo</div><div class="v" id="aCombo">0</div></div>
+      <div class="stat"><div class="l">Lives</div><div class="hearts" id="aLives"></div></div>
+    </div>
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <div class="overlay" id="aOver">
+        <h2>Word Rain</h2>
+        <p>Words fall from the sky. Type one to blast it before it hits the ground. Longer combos multiply your score. Your weak keys show up more often.</p>
+        <p id="aBest" style="color:var(--gold);font-weight:700"></p>
+        <button class="btn" id="aStart">Start (Enter)</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="v-stats" hidden style="display:flex;flex-direction:column;gap:14px">
+    <div class="sgrid" id="sTiles"></div>
+    <div class="two">
+      <div class="panel"><h3 style="margin-bottom:10px">Recent sessions</h3><div id="hist"></div></div>
+      <div class="panel"><h3 style="margin-bottom:10px">Keys to practice</h3><ul class="weak" id="weakList"></ul></div>
+    </div>
+    <div class="panel"><h3 style="margin-bottom:4px">Key heatmap</h3><p class="note" style="margin-bottom:12px">Green keys are fast and accurate. Red keys cost you the most. Grey keys have too little data yet.</p><div class="kb heat" id="heat"></div></div>
+    <div><button class="btn ghost" id="reset">Reset all progress</button></div>
+  </section>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e};
+const rnd=n=>Math.floor(Math.random()*n);
+const pick=a=>a[rnd(a.length)];
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+
+/* ---------- storage ---------- */
+const LS="keystrike.v1";
+function fresh(){return{xp:0,streak:0,last:"",lessons:{},keys:{},hist:[],arcadeBest:0,sound:true,sessions:0,chars:0}}
+function load(){try{const v=JSON.parse(localStorage.getItem(LS));return Object.assign(fresh(),v||{})}catch(e){return fresh()}}
+let S=load();
+function save(){try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}}
+
+/* ---------- data ---------- */
+const WORDS=("the be to of and in that have it for not on with he as you do at this but his by from they we say her she or an will my one all would there their what so up out if about who get which go me when make can like time no just him know take people into year your good some could them see other than then now look only come its over think also back after use two how our work first well way even new want because any these give day most us is was are were been has had did said each many ask sad dad lad fall flask salad flak fad ads add lass alas lads falls skald salsa sass alfalfa flaks adds fads life side field desk slide fix kiss lies idle else eel jade leaf fiddle skill lead feel file sail silk dike flies ideal safe fake lake sake like keel seed deed feed fed led less jade fell sell sleek dull skis disk risk rule user ruler rude fire rise sure rise jury juice fruit ride read real rice rare after surf turf ruse sir sue us dir drill rid fur fear jar jug jus rake rail rush the this that than then they them there these thin thick third thirty thing think thought tight tile till time tired title tithe hit hat hurt hurt shirt shift thrift thread threat three throat rather father feather leather healthy heat height hit heart earth hair hail hall halt hers hide high hike hill hire list less last lust late later latest taste test tested thus tune tuned turn truth trust true tread treat trail train trade track top ton tone tongue toad toe long song strong string spring bring thing going doing being along among among gone gang gong nose note none noon nine neat near need never night north not nor nod nod door doing donor dog dig dug dung ring rang rung hang hung gnat grid grin gold gone good green grow ground group guide guard gift girl give glad go goal god cat cut cup cure code coin cold come cool core cost count court cover cross crowd cloud clock close club clean clear climb mom man map mat may meet mile mind mine miss mist mouth movie music most much must mean meal meat mice wait walk wall want warm wash watch water wave week weigh well went west what wheel where which while white whole why wide wife wild will wind window wise wish with woman wood word work world would write wrong crew crown wick wrist cow how now new own owl bag big bad bed bet bit bog bug bun bus but buy back bake band bank base bath beat bear beach beard begin best better bird bite black blue board boat body bone book born both bottom bowl brain brave bread break bridge bright bring brown build burn busy pack page paid pain pair paper park part party pass past path pay peace pen people pet piece pink pipe place plain plan plane plant play please plot plus point pond pool poor port post pot pound power press price pride print prize proud pull pure push put yard year yell yes yet you young your youth yellow yield yoga yacht very vase vast verb vest view village visit voice voice vote vow valid value vary van vine violet vital vivid victory party pretty happy copy empty any only family plenty city story every study body quick quiet quite quit quiz queen quote quest quality question square equal quiver quilt quack quaint quarter jazz jump just judge joy join joke jolly journey jewel jaw jet jog zero zone zoo zip zinc zeal zest size maze lazy crazy dozen frozen freeze breeze sneeze prize wizard blizzard box fix six next exit extra tax wax relax fox mix mixed expert explain express extend exact example excite expand excuse exam axe tax text taxi box boxer lax flex index complex expect expense experience").split(/\s+/).filter((w,i,a)=>w&&a.indexOf(w)===i);
+const SENT=["The quick brown fox jumps over the lazy dog.","Practice makes progress, not perfection.","Slow is smooth, and smooth is fast.","Every expert was once a beginner.","Keep your eyes on the screen, not the keys.","Type with rhythm, and speed will follow.","Small steps every day beat big leaps once a year.","Accuracy first, then speed.","Fingers on the home row, always return.","Jack quickly mixed five dozen big potions.","Don't look down, you've got this.","Where did all the good keys go?","Calm hands type faster than rushed hands."];
+
+const ROWS=["qwertyuiop","asdfghjkl;'","zxcvbnm,."];
+const FCOL=["var(--f0)","var(--f1)","var(--f2)","var(--f3)","var(--f4)","var(--f5)","var(--f6)","var(--f7)"];
+const FNAME=["left pinky","left ring finger","left middle finger","left index finger","right index finger","right middle finger","right ring finger","right pinky"];
+const FINGER={};[["qaz",0],["wsx",1],["edc",2],["rfvtgb",3],["yhnujm",4],["ik,",5],["ol.",6],["p;'",7]].forEach(([ks,f])=>[...ks].forEach(k=>FINGER[k]=f));
+const LEFTHAND=new Set("qwertasdfgzxcvb");
+const LESSONS=[
+ {name:"Index Anchors",keys:"fj"},{name:"Middle Fingers",keys:"dk"},{name:"Home Row Finish",keys:"sla"},
+ {name:"Reach Up: E I",keys:"ei"},{name:"Reach Up: R U",keys:"ru"},{name:"Stretch: T H",keys:"th"},
+ {name:"Round Out: O N G",keys:"ong"},{name:"Bottom Row: C M W",keys:"cmw"},{name:"Tough Ones: B P Y V",keys:"bpyv"},
+ {name:"Rare Letters: Q X Z",keys:"qxz"},{name:"Real Sentences",keys:"",sent:true}];
+LESSONS.forEach((l,i)=>{l.id=i;l.allowed=LESSONS.slice(0,i+1).map(x=>x.keys).join("");l.target=Math.round(10+i*2.5)});
+const RANKS=["Hunt-and-Pecker","Home Row Rookie","Keycap Cadet","Rhythm Keeper","Swift Fingers","Touch Typist","Key Slinger","Word Smith","Speed Demon","Lightning Hands","Keyboard Legend"];
+const lvlOf=xp=>Math.floor(Math.sqrt(xp/40))+1;
+const xpAt=l=>40*(l-1)*(l-1);
+
+/* ---------- audio ---------- */
+let AC=null;
+function beep(f,d,type,v){if(!S.sound)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type=type||"sine";o.frequency.value=f;g.gain.value=v||.04;g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+d);o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d)}catch(e){}}
+const sTick=c=>beep(520+Math.min(c,40)*10,.06,"triangle",.035);
+const sBad=()=>beep(130,.14,"sawtooth",.05);
+const sWin=()=>[523,659,784,1047].forEach((f,i)=>setTimeout(()=>beep(f,.25,"triangle",.06),i*110));
+const sBoom=()=>beep(300,.12,"square",.03);
+
+/* ---------- particles ---------- */
+const fx=$("#fx"),fc=fx.getContext("2d");let P=[],fxOn=false,fxLast=0,dpr=Math.max(1,window.devicePixelRatio||1);
+function fxSize(){dpr=Math.max(1,window.devicePixelRatio||1);fx.width=innerWidth*dpr;fx.height=innerHeight*dpr;fc.setTransform(dpr,0,0,dpr,0,0)}
+fxSize();addEventListener("resize",fxSize);
+function burst(x,y,col,n,spd){for(let i=0;i<n;i++){const a=Math.random()*6.283,s=(.3+Math.random())*(spd||170);P.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-40,l:1,col,r:2+Math.random()*3})}
+ if(!fxOn){fxOn=true;fxLast=performance.now();requestAnimationFrame(fxLoop)}}
+function fxLoop(t){const dt=Math.min(.05,(t-fxLast)/1000);fxLast=t;fc.clearRect(0,0,innerWidth,innerHeight);
+ P=P.filter(p=>p.l>0);for(const p of P){p.l-=dt*1.8;p.vy+=380*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;fc.globalAlpha=Math.max(0,p.l);fc.fillStyle=p.col;fc.fillRect(p.x,p.y,p.r,p.r)}
+ fc.globalAlpha=1;if(P.length)requestAnimationFrame(fxLoop);else fxOn=false}
+const colOf=ch=>{const f=FINGER[ch.toLowerCase()];const v=f==null?"--f8":"--f"+f;return getComputedStyle(document.documentElement).getPropertyValue(v).trim()||"#ffd166"};
+function popText(txt,x,y,col){const d=el("div","pop",txt);d.style.left=x+"px";d.style.top=y+"px";if(col)d.style.color=col;document.body.append(d);setTimeout(()=>d.remove(),950)}
+let toastT;function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>e.classList.remove("show"),2400)}
+
+/* ---------- progress ---------- */
+function weakKeys(n){const out=[];for(const k in S.keys){const s=S.keys[k];if(!/[a-z]/.test(k))continue;const tot=s.h+s.m;if(tot<8)continue;const rate=s.m/tot,avg=s.n?s.t/s.n:0;const sc=rate*100+Math.max(0,(avg-380)/12);if(sc>6)out.push([k,sc,rate,avg])}
+ return out.sort((a,b)=>b[1]-a[1]).slice(0,n)}
+function noteKey(ch,ok,ms){const k=ch.toLowerCase();const s=S.keys[k]||(S.keys[k]={h:0,m:0,t:0,n:0});if(ok){s.h++;if(ms!=null&&ms<2500){s.t+=ms;s.n++}}else s.m++}
+function touchDay(){const today=new Date().toLocaleDateString("en-CA");if(S.last===today)return;const y=new Date(Date.now()-864e5).toLocaleDateString("en-CA");S.streak=S.last===y?S.streak+1:1;S.last=today}
+function addXP(n){const before=lvlOf(S.xp);S.xp+=Math.max(0,Math.round(n));const after=lvlOf(S.xp);if(after>before){toast("Level "+after+": "+RANKS[Math.min(after-1,RANKS.length-1)]);sWin()}renderHead()}
+function renderHead(){const l=lvlOf(S.xp),a=xpAt(l),b=xpAt(l+1);$("#lvl").textContent="LV "+l;$("#rankName").textContent=RANKS[Math.min(l-1,RANKS.length-1)];$("#xpbar").style.width=((S.xp-a)/(b-a)*100)+"%";
+ $("#streak").textContent=S.streak+(S.streak===1?" day streak":" day streak");$("#snd").textContent=S.sound?"Sound on":"Sound off";$("#snd").setAttribute("aria-pressed",S.sound)}
+const unlocked=i=>i===0||(S.lessons[i-1]&&S.lessons[i-1].stars>=1);
+
+/* ---------- keyboard widget ---------- */
+function buildKb(root){root.innerHTML="";const map={};
+ ROWS.forEach((r,ri)=>{const row=el("div","krow");if(ri===1)row.style.marginLeft="calc(var(--ku)*.4)";
+  if(ri===2){const s=el("div","key wide","shift");map.ShiftL=s;row.append(s)}
+  [...r].forEach(ch=>{const k=el("div","key","<span>"+ch+"</span>");k.style.setProperty("--fc",FCOL[FINGER[ch]]);map[ch]=k;row.append(k)});
+  if(ri===2){const s=el("div","key wide","shift");map.ShiftR=s;row.append(s)}
+  root.append(row)});
+ const sr=el("div","krow");const sp=el("div","key space","space");sp.style.setProperty("--fc","var(--f8)");map[" "]=sp;sr.append(sp);root.append(sr);return map}
+function mark(map,cls,ch,ms){const k=map[ch.toLowerCase()];if(!k)return;k.classList.remove(cls);void k.offsetWidth;k.classList.add(cls);setTimeout(()=>k.classList.remove(cls),ms||150)}
+
+/* ---------- views ---------- */
+let view="train";
+function setView(v){if(view==="train"&&v!=="train"&&T)quitLesson();if(view==="arcade"&&v!=="arcade")arcStop();view=v;
+ document.querySelectorAll(".tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.view===v));
+ ["train","arcade","stats"].forEach(n=>{$("#v-"+n).hidden=n!==v});
+ if(v==="train")showMap();if(v==="arcade"){arcResize();arcIdle()}if(v==="stats")renderStats()}
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>setView(b.dataset.view));
+$("#snd").onclick=()=>{S.sound=!S.sound;save();renderHead()};
+
+/* ---------- lesson text ---------- */
+function pseudo(allowed,news){const n=2+rnd(4);let w="";for(let i=0;i<n;i++)w+=pick(allowed);if(news&&news.length&&Math.random()<.85){const p=rnd(n);w=w.slice(0,p)+pick(news)+w.slice(p+1)}return w}
+function genText(l){
+ if(l.sent)return shuffle(SENT).slice(0,4).join(" ");
+ const allowed=l.allowed,news=l.keys;const weak=weakKeys(3).map(x=>x[0]).filter(k=>allowed.includes(k));
+ const cand=WORDS.filter(w=>[...w].every(c=>allowed.includes(c)));
+ const wt=w=>1+([...w].some(c=>news.includes(c))?4:0)+weak.reduce((s,k)=>s+(w.includes(k)?2:0),0);
+ const pp=cand.length<8?1:cand.length<30?.45:cand.length<70?.15:0;const N=l.drill?26:22;const out=[];
+ while(out.length<N){let w;if(Math.random()<pp)w=pseudo(allowed,news);else{const tot=cand.reduce((s,x)=>s+wt(x),0);let r=Math.random()*tot;w=cand[0];for(const x of cand){r-=wt(x);if(r<=0){w=x;break}}}
+  if(w!==out[out.length-1])out.push(w)}
+ return out.join(" ")}
+
+/* ---------- train: map ---------- */
+function stars(n){return '<span class="stars"><b>'+"★".repeat(n)+"</b>"+"★".repeat(3-n)+"</span>"}
+function showMap(){$("#map-wrap").hidden=false;$("#play").hidden=true;$("#result").hidden=true;const m=$("#map");m.innerHTML="";
+ LESSONS.forEach(l=>{const rec=S.lessons[l.id]||{stars:0,best:0};const b=el("button","card");b.disabled=!unlocked(l.id);
+  const caps=l.sent?'<span class="cap" style="--c:var(--f8)">A–z . , \'</span>':[...l.keys].map(k=>'<span class="cap" style="--c:'+FCOL[FINGER[k]]+'">'+k+"</span>").join("");
+  b.innerHTML='<span class="n">LESSON '+String(l.id+1).padStart(2,"0")+"</span><h3>"+l.name+'</h3><div class="caps">'+caps+'</div><div class="row">'+stars(rec.stars)+'<span class="best">'+(rec.best?rec.best+" wpm best":"goal "+l.target+" wpm")+"</span></div>";
+  b.onclick=()=>startLesson(l);m.append(b)});
+ const wk=weakKeys(4);const d=el("button","card drill");d.disabled=!wk.length;
+ d.innerHTML='<span class="n">PRACTICE</span><h3>Weak-Key Drill</h3><div class="caps">'+(wk.length?wk.map(x=>'<span class="cap" style="--c:'+FCOL[FINGER[x[0]]]+'">'+x[0]+"</span>").join(""):'<span class="note">Play a few lessons first</span>')+'</div><div class="row"><span class="best">'+(wk.length?"built from your slowest keys":"no weak keys found yet")+"</span></div>";
+ d.onclick=()=>{let top=0;LESSONS.forEach(l=>{if(unlocked(l.id))top=l.id});startLesson({id:"drill",drill:true,name:"Weak-Key Drill",keys:wk.map(x=>x[0]).join(""),allowed:LESSONS[top].allowed,target:LESSONS[top].target})};
+ m.append(d)}
+
+/* ---------- train: play ---------- */
+let T=null,kbMap=null;
+function startLesson(l){const text=genText(l);T={l,text,pos:0,ok:0,err:0,combo:0,best:0,t0:0,last:0,missed:{},fixed:new Set(),spans:[],timer:null};
+ $("#map-wrap").hidden=true;$("#result").hidden=true;$("#play").hidden=false;$("#pTitle").textContent=l.name;$("#pGoal").textContent="Goal "+l.target+" wpm";
+ const box=$("#text");box.innerHTML="";box.scrollTop=0;let word=el("span","w");box.append(word);
+ [...text].forEach((ch,i)=>{const s=el("span","c"+(ch===" "?" sp":""),ch===" "?"&nbsp;":ch.replace("&","&amp;"));s.style.setProperty("--cc",colOf(ch===" "?"f":ch));T.spans.push(s);word.append(s);if(ch===" "){word=el("span","w");box.append(word)}});
+ kbMap=buildKb($("#kb"));$("#legend").innerHTML=FNAME.map((n,i)=>'<span><i style="--c:'+FCOL[i]+'"></i>'+n+"</span>").join("");
+ $("#startHint").hidden=false;updHud();focusNext();T.timer=setInterval(updHud,150)}
+function quitLesson(){if(T){clearInterval(T.timer);T=null}if(view==="train")showMap()}
+$("#pQuit").onclick=quitLesson;
+function focusNext(){const ch=T.text[T.pos];if(ch==null)return;T.spans.forEach(s=>s.classList.remove("cur"));const s=T.spans[T.pos];s.classList.add("cur");
+ const inner=$("#text");inner.scrollTop=Math.max(0,s.offsetTop-s.offsetHeight*1.0);
+ Object.values(kbMap).forEach(k=>k.classList.remove("next"));const low=ch.toLowerCase();const k=kbMap[low];if(k)k.classList.add("next");
+ const up=ch!==low&&ch.toUpperCase()===ch&&/[A-Z]/.test(ch);let hint="";
+ if(up){const sh=LEFTHAND.has(low)?"ShiftR":"ShiftL";kbMap[sh].classList.add("next");kbMap[sh].style.setProperty("--fc","var(--f8)");hint="Hold <b>"+(LEFTHAND.has(low)?"right":"left")+" shift</b> with your other hand"}
+ const f=FINGER[low];$("#hint").style.setProperty("--hc",f==null?"var(--fg)":FCOL[f]);
+ $("#hint").innerHTML=ch===" "?"Use your <b>thumb</b>":(hint?hint+", then ":"Use your ")+(f!=null?"<b>"+FNAME[f]+"</b>":"")}
+function wpmNow(){if(!T.t0)return 0;const m=(performance.now()-T.t0)/60000;return m>0.004?Math.round(T.ok/5/m):0}
+function accNow(){const t=T.ok+T.err;return t?Math.round(T.ok/t*100):100}
+function updHud(){if(!T)return;const w=wpmNow();$("#hWpm").innerHTML=w+' <span class="s">wpm</span>';
+ $("#gArc").style.strokeDashoffset=157*(1-Math.min(1,w/(T.l.target*1.6)));$("#gArc").style.stroke=w>=T.l.target?"var(--f3)":"var(--f4)";
+ $("#hAcc").textContent=accNow()+"%";$("#hErr").textContent=T.err+(T.err===1?" mistake":" mistakes");$("#hCombo").textContent=T.combo;
+ $("#comboFill").style.width=Math.min(100,T.combo%50*2)+"%";$("#prog").style.width=(T.pos/T.text.length*100)+"%"}
+function handleTrain(e){
+ if(e.key==="Escape"){quitLesson();return}
+ if(e.key.length!==1)return;e.preventDefault();const now=performance.now();
+ if(!T.t0){T.t0=now;T.last=now;$("#startHint").hidden=true}
+ const want=T.text[T.pos],got=e.key,sp=T.spans[T.pos];const r=sp.getBoundingClientRect();
+ if(got===want){const ms=now-T.last;T.last=now;noteKey(want,true,ms);T.ok++;T.combo++;T.best=Math.max(T.best,T.combo);sp.classList.remove("err");sp.classList.add(T.fixed.has(T.pos)?"fix":"ok");
+  burst(r.left+r.width/2,r.top+r.height/2,colOf(want===" "?"f":want),5+Math.min(8,T.combo>>3),120);mark(kbMap,"hit",want,140);sTick(T.combo);
+  if(T.combo&&T.combo%25===0){const mult=1+T.combo/25;popText("x"+mult+" combo!",r.left,r.top-10,"var(--gold)");burst(r.left,r.top,"#ffd166",30,260)}
+  T.pos++;if(T.pos>=T.text.length){finishLesson();return}focusNext();updHud()}
+ else{noteKey(want,false);T.err++;T.combo=0;T.missed[want.toLowerCase()]=(T.missed[want.toLowerCase()]||0)+1;T.fixed.add(T.pos);sBad();
+  sp.classList.remove("err");void sp.offsetWidth;sp.classList.add("err");setTimeout(()=>sp&&sp.classList.remove("err"),230);mark(kbMap,"bad",got.toLowerCase(),180);updHud()}}
+function finishLesson(){clearInterval(T.timer);const w=wpmNow(),acc=accNow(),l=T.l;let st=0;
+ if(acc>=90)st=1;if(acc>=95&&w>=l.target)st=2;if(acc>=98&&w>=l.target*1.25)st=3;
+ const rec=S.lessons[l.id]||{stars:0,best:0};const newBest=w>rec.best&&acc>=90;const hadUnlock=l.id!=="drill"&&st>=1&&rec.stars<1&&l.id<LESSONS.length-1;
+ if(l.id!=="drill"){rec.stars=Math.max(rec.stars,st);if(acc>=90)rec.best=Math.max(rec.best,w);S.lessons[l.id]=rec}
+ const gain=T.ok*(acc>=95?1:.6)*.5+st*20;touchDay();S.sessions++;S.chars+=T.ok;S.hist.push({t:Date.now(),wpm:w,acc,m:"t"});S.hist=S.hist.slice(-40);addXP(gain);save();
+ const missed=Object.entries(T.missed).sort((a,b)=>b[1]-a[1]).slice(0,4);const next=l.id!=="drill"&&l.id<LESSONS.length-1&&unlocked(l.id+1);
+ const msg=st===0?"Clean runs beat fast runs. Aim for 90% accuracy and you'll unlock more.":st===3?"Flawless and fast. Lesson mastered.":st===2?"Solid. Push 25% above goal and stay clean for the third star.":"Passed. Hit the goal speed with 95% accuracy for the next star.";
+ const bestCombo=T.best;T=null;$("#play").hidden=true;const R=$("#result");R.hidden=false;
+ const star=i=>'<svg class="'+(i<st?"on":"")+'" style="--d:'+(i*.25+.2)+'s" viewBox="0 0 24 24"><path d="M12 2l3 6.9 7.5.7-5.7 5 1.7 7.4L12 18l-6.5 4 1.7-7.4-5.7-5 7.5-.7z"/></svg>';
+ R.innerHTML='<h2>'+(st?"Lesson complete":"Not quite yet")+'</h2><div class="bigstars">'+[0,1,2].map(star).join("")+'</div><p class="note">'+msg+'</p><div class="rgrid"><div class="stat"><div class="l">Speed</div><div class="v">'+w+'</div><div class="s">goal '+l.target+" wpm"+(newBest?" · new best":"")+'</div></div><div class="stat"><div class="l">Accuracy</div><div class="v">'+acc+'%</div></div><div class="stat"><div class="l">Best combo</div><div class="v">'+bestCombo+'</div></div><div class="stat"><div class="l">XP</div><div class="v">+'+Math.round(gain)+"</div></div></div>"+
+  (missed.length?'<div class="note">Slip-ups: '+missed.map(([k,n])=>'<b style="color:'+(FINGER[k]!=null?FCOL[FINGER[k]]:"var(--fg)")+'">'+(k===" "?"space":k)+"</b> ×"+n).join(" · ")+"</div>":"")+
+  (hadUnlock?'<div class="chip" style="background:var(--gold);color:#241b00;border:0">Next lesson unlocked</div>':"")+
+  '<div class="actions">'+(next?'<button class="btn" id="rNext">Next lesson</button>':"")+'<button class="btn '+(next?"ghost":"")+'" id="rAgain">Try again</button><button class="btn ghost" id="rMap">All lessons</button></div>';
+ $("#rAgain").onclick=()=>startLesson(l);$("#rMap").onclick=showMap;if(next)$("#rNext").onclick=()=>startLesson(LESSONS[l.id+1]);
+ if(st)sWin();for(let i=0;i<6;i++)setTimeout(()=>burst(innerWidth*(.2+Math.random()*.6),innerHeight*.3,pick(FCOL.map((_,j)=>colOf("qwertyuiop"[j]))),30,300),i*120)}
+
+/* ---------- arcade ---------- */
+const cv=$("#cv"),cx=cv.getContext("2d");let AW=600,AH=460,A=null,arcRaf=0;
+function arcResize(){const r=cv.getBoundingClientRect();AW=Math.max(280,r.width);AH=460;cv.width=AW*dpr;cv.height=AH*dpr;cx.setTransform(dpr,0,0,dpr,0,0);if(!A||!A.run)arcDraw()}
+addEventListener("resize",()=>{if(view==="arcade")arcResize()});
+const POOL=WORDS.filter(w=>/^[a-z]+$/.test(w)&&w.length>=3&&w.length<=10);
+function arcIdle(){A=null;$("#aOver").hidden=false;$("#aOver").querySelector("h2").textContent="Word Rain";$("#aOver").querySelector("p").textContent="Words fall from the sky. Type one to blast it before it hits the ground. Longer combos multiply your score. Your weak keys show up more often.";
+ $("#aBest").textContent=S.arcadeBest?"Best score: "+S.arcadeBest:"";$("#aStart").textContent="Start (Enter)";arcDraw();arcHud()}
+function arcStart(){A={run:true,words:[],score:0,lives:5,wave:1,killed:0,combo:0,bestCombo:0,ok:0,miss:0,t0:performance.now(),spawn:.3,active:null,last:performance.now(),flash:0,shake:0,banner:1.6};
+ $("#aOver").hidden=true;cancelAnimationFrame(arcRaf);arcRaf=requestAnimationFrame(arcLoop)}
+function arcStop(){if(A)A.run=false;cancelAnimationFrame(arcRaf)}
+function arcWord(){const maxLen=Math.min(10,3+A.wave);const weak=weakKeys(3).map(x=>x[0]);let c=POOL.filter(w=>w.length<=maxLen);
+ if(weak.length&&Math.random()<.35){const wc=c.filter(w=>weak.some(k=>w.includes(k)));if(wc.length)c=wc}
+ for(let i=0;i<8;i++){const w=pick(c);if(!A.words.some(x=>x.text===w||x.text[0]===w[0]&&x.y<120))return w}return pick(c)}
+function spawn(){const text=arcWord();cx.font='600 20px "JetBrains Mono",monospace';const w=cx.measureText(text).width+30;let x=0;
+ for(let i=0;i<6;i++){x=10+Math.random()*(AW-w-20);if(!A.words.some(o=>o.y<60&&x<o.x+o.w+8&&x+w+8>o.x))break}
+ A.words.push({text,x,y:-30,w,v:34+A.wave*6+Math.random()*14,typed:0})}
+function arcLoop(now){if(!A||!A.run)return;const dt=Math.min(.05,(now-A.last)/1000);A.last=now;
+ A.spawn-=dt;if(A.spawn<=0){spawn();A.spawn=Math.max(.8,2.4-A.wave*.15)}
+ for(const w of A.words.slice()){w.y+=w.v*dt;if(w.y+34>=AH-26){A.words.splice(A.words.indexOf(w),1);if(A.active===w)A.active=null;A.lives--;A.combo=0;A.flash=.4;A.shake=.3;sBoom();if(A.lives<=0){arcEnd();return}}}
+ A.flash=Math.max(0,A.flash-dt);A.shake=Math.max(0,A.shake-dt);A.banner=Math.max(0,A.banner-dt);arcDraw();arcHud();arcRaf=requestAnimationFrame(arcLoop)}
+function arcHud(){$("#aScore").textContent=A?A.score:0;$("#aWave").textContent=A?A.wave:1;$("#aCombo").textContent=A?A.combo:0;
+ const l=A?A.lives:5;$("#aLives").innerHTML=[0,1,2,3,4].map(i=>'<i class="'+(i<l?"":"off")+'"></i>').join("")}
+function arcDraw(){const c=cx;c.save();if(A&&A.shake>0)c.translate((Math.random()-.5)*8,(Math.random()-.5)*8);
+ c.fillStyle="#0b0d14";c.fillRect(-10,-10,AW+20,AH+20);c.strokeStyle="rgba(255,255,255,.035)";c.lineWidth=1;for(let x=0;x<AW;x+=44){c.beginPath();c.moveTo(x,0);c.lineTo(x,AH);c.stroke()}
+ const g=c.createLinearGradient(0,AH-60,0,AH);g.addColorStop(0,"rgba(255,93,115,0)");g.addColorStop(1,"rgba(255,93,115,.28)");c.fillStyle=g;c.fillRect(0,AH-60,AW,60);
+ c.fillStyle="#ff5d73";c.fillRect(0,AH-26,AW,2);
+ if(A){c.font='600 20px "JetBrains Mono",monospace';c.textBaseline="middle";
+  for(const w of A.words){const act=w===A.active;const col=colOf(w.text[0]);c.fillStyle=act?"#2a3050":"#191d2b";c.strokeStyle=col;c.lineWidth=act?3:1.5;
+   if(act){c.shadowColor=col;c.shadowBlur=18}rr(c,w.x,w.y,w.w,34,10);c.fill();c.stroke();c.shadowBlur=0;
+   let tx=w.x+15;for(let i=0;i<w.text.length;i++){const ch=w.text[i];c.fillStyle=i<w.typed?"#ffd166":"#eceef6";c.fillText(ch,tx,w.y+18);tx+=c.measureText(ch).width}}
+  if(A.banner>0){c.globalAlpha=Math.min(1,A.banner);c.fillStyle="#ffd166";c.font='800 40px "Bricolage Grotesque",sans-serif';c.textAlign="center";c.fillText("Wave "+A.wave,AW/2,AH/2-40);c.textAlign="left";c.globalAlpha=1}
+  if(A.flash>0){c.fillStyle="rgba(255,93,115,"+A.flash*.6+")";c.fillRect(0,0,AW,AH)}}
+ c.restore()}
+function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()}
+function handleArcade(e){
+ if(!A||!A.run){if(e.key==="Enter"||e.key===" "){e.preventDefault();arcStart()}return}
+ if(e.key==="Escape"){arcStop();arcIdle();return}
+ if(e.key.length!==1)return;e.preventDefault();const k=e.key.toLowerCase();if(!/[a-z]/.test(k))return;
+ if(!A.active){let b=null;for(const w of A.words)if(w.text[0]===k&&(!b||w.y>b.y))b=w;if(b){A.active=b}}
+ const w=A.active;
+ if(w&&w.text[w.typed]===k){w.typed++;A.ok++;A.combo++;A.bestCombo=Math.max(A.bestCombo,A.combo);noteKey(k,true,null);sTick(A.combo);
+  const r=cv.getBoundingClientRect();burst(r.left+w.x+14+w.typed*12,r.top+w.y+17,colOf(k),4,100);
+  if(w.typed>=w.text.length){const mult=1+Math.floor(A.combo/15);A.score+=w.text.length*10*mult;A.killed++;A.words.splice(A.words.indexOf(w),1);A.active=null;burst(r.left+w.x+w.w/2,r.top+w.y+17,colOf(k),26,260);
+   if(mult>1)popText("x"+mult,r.left+w.x,r.top+w.y,"var(--gold)");if(A.killed%8===0){A.wave++;A.banner=1.6;toast("Wave "+A.wave)}}}
+ else{A.miss++;A.combo=0;noteKey(w?w.text[w.typed]:k,false);sBad();A.shake=.12}}
+function arcEnd(){A.run=false;const m=(performance.now()-A.t0)/60000,w=Math.round(A.ok/5/m),acc=A.ok+A.miss?Math.round(A.ok/(A.ok+A.miss)*100):100;
+ const best=A.score>S.arcadeBest;if(best)S.arcadeBest=A.score;touchDay();S.sessions++;S.chars+=A.ok;S.hist.push({t:Date.now(),wpm:w,acc,m:"a"});S.hist=S.hist.slice(-40);const gain=A.score/20;addXP(gain);save();arcDraw();arcHud();
+ const o=$("#aOver");o.hidden=false;o.querySelector("h2").textContent=best?"New high score: "+A.score:"Game over: "+A.score;
+ o.querySelector("p").textContent="Wave "+A.wave+" · "+A.killed+" words · "+w+" wpm · "+acc+"% accuracy · best combo "+A.bestCombo+" · +"+Math.round(gain)+" XP";$("#aBest").textContent="Best score: "+S.arcadeBest;$("#aStart").textContent="Play again (Enter)";sWin()}
+$("#aStart").onclick=arcStart;
+
+/* ---------- stats ---------- */
+function renderStats(){const h=S.hist,last=h.slice(-10);const avg=a=>a.length?Math.round(a.reduce((s,x)=>s+x,0)/a.length):0;
+ const bestW=h.reduce((m,x)=>x.acc>=90?Math.max(m,x.wpm):m,0);
+ const tile=(l,v,s)=>'<div class="stat"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="s">'+s+"</div></div>";
+ $("#sTiles").innerHTML=tile("Best speed",bestW,"wpm at 90%+ accuracy")+tile("Recent speed",avg(last.map(x=>x.wpm)),"wpm, last 10 sessions")+tile("Recent accuracy",avg(last.map(x=>x.acc))+"%","last 10 sessions")+tile("Keys typed",S.chars.toLocaleString(),S.sessions+" sessions");
+ const hs=$("#hist");if(!h.length)hs.innerHTML='<p class="note">Finish a lesson or a Word Rain game and your speed will chart here.</p>';
+ else{const mx=Math.max(40,...h.map(x=>x.wpm));const W=420,H=130,n=Math.min(h.length,20),bw=W/20;const d=h.slice(-n);
+  let svg='<svg class="chart" viewBox="0 0 '+(W+28)+" "+(H+22)+'" role="img" aria-label="Words per minute for recent sessions">';
+  [0,.5,1].forEach(f=>{const y=H-f*(H-10);svg+='<line x1="28" x2="'+(W+28)+'" y1="'+y+'" y2="'+y+'" stroke="var(--line)"/><text x="0" y="'+(y+3)+'">'+Math.round(mx*f)+"</text>"});
+  d.forEach((x,i)=>{const bh=x.wpm/mx*(H-10);svg+='<rect x="'+(28+i*bw+3)+'" y="'+(H-bh)+'" width="'+(bw-6)+'" height="'+bh+'" rx="3" fill="'+(x.acc>=95?"var(--f3)":x.acc>=90?"var(--f2)":"var(--f0)")+'"><title>'+x.wpm+" wpm, "+x.acc+"% accuracy</title></rect>"});
+  svg+='<text x="28" y="'+(H+16)+'">older</text><text x="'+(W+28)+'" y="'+(H+16)+'" text-anchor="end">newest</text></svg>';hs.innerHTML=svg+'<p class="note" style="margin-top:6px">Bar height is wpm. Green is 95%+ accurate, yellow 90–95%, red below 90%.</p>'}
+ const wk=weakKeys(6);$("#weakList").innerHTML=wk.length?wk.map(x=>'<li><span class="cap" style="--c:'+FCOL[FINGER[x[0]]]+'">'+x[0]+'</span><span>'+Math.round((1-x[2])*100)+"% accurate</span><span>"+(x[3]?Math.round(x[3])+" ms":"")+"</span></li>").join(""):'<li class="note">No weak keys yet. Keep typing and they will show up here.</li>';
+ const m=buildKb($("#heat"));for(const k in m){if(k.length>1)continue;const s=S.keys[k];const b=m[k];if(!s||s.h+s.m<5||!/[a-z;,.']/.test(k)){b.style.background="var(--panel2)";b.style.color="var(--dim)";continue}
+  const rate=s.m/(s.h+s.m),avg=s.n?s.t/s.n:400;const score=Math.max(0,Math.min(1,1-(rate*6+Math.max(0,avg-300)/900)));b.style.background="hsl("+Math.round(score*130)+" 65% 58%)";b.innerHTML="<span>"+k+"</span><small>"+(s.n?Math.round(avg):"")+"</small>"}}
+let armed=false;$("#reset").onclick=function(){if(!armed){armed=true;this.textContent="Click again to erase everything";setTimeout(()=>{armed=false;this.textContent="Reset all progress"},3500);return}S=fresh();save();armed=false;this.textContent="Reset all progress";renderHead();renderStats()};
+
+/* ---------- input ---------- */
+addEventListener("keydown",e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;
+ if(view==="train"&&T)handleTrain(e);else if(view==="arcade")handleArcade(e)});
+
+/* ---------- boot ---------- */
+$("#logoKeys").innerHTML=[0,1,2,3].map(i=>'<b style="background:'+FCOL[i+2]+'"></b>').join("");
+renderHead();showMap();
+})();
+</script>
